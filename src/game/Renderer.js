@@ -26,10 +26,6 @@ export default class Renderer {
     this.webGLRenderer.setPixelRatio(pixelRatio);
     this.composer.setSize(width, height);
     this.composer.setPixelRatio(pixelRatio);
-    this.effectFXAA.uniforms['resolution'].value.set(
-      1 / (width * pixelRatio),
-      1 / (height * pixelRatio),
-    );
   }
 
   update(scene, camera) {
