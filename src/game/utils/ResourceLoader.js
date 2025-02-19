@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/Addons.js';
+import urlBuilder from './urlBuilder';
 
 export default class ResourceLoader {
   constructor() {
@@ -10,7 +11,7 @@ export default class ResourceLoader {
     // this.loaders.cubeTextureLoader = new THREE.CubeTextureLoader()
 
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath('/draco/');
+    dracoLoader.setDecoderPath(urlBuilder.buildUrl('/draco/'));
     this.loaders.gltfLoader.setDRACOLoader(dracoLoader);
 
     this.loaderMap = {

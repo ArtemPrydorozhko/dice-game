@@ -7,6 +7,7 @@ import ResourceLoader from '../utils/ResourceLoader.js';
 import Board from './Board.js';
 import Dice from './Dice.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
+import urlBuilder from '../utils/urlBuilder.js';
 
 export default class World {
   constructor() {
@@ -35,11 +36,11 @@ export default class World {
     [this.diceModel, this.boardModel] = await Promise.all([
       this.resourceLoader.load({
         type: 'gltfModel',
-        path: '/models/dice/dice.glb',
+        path: urlBuilder.buildUrl('/models/dice/dice.glb'),
       }),
       this.resourceLoader.load({
         type: 'gltfModel',
-        path: '/models/board/board.glb',
+        path: urlBuilder.buildUrl('/models/board/board.glb'),
       }),
     ]);
     this.board = new Board(this.boardModel);
