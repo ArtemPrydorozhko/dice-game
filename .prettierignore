@@ -1,0 +1,6 @@
+/dist
+/static
+/models
+node_modules
+package-lock.json
+.github
