@@ -5,9 +5,10 @@ import urlBuilder from './urlBuilder';
 
 export default class ResourceLoader {
   constructor() {
+    this.loadingManager = new THREE.LoadingManager();
     this.loaders = {};
-    this.loaders.gltfLoader = new GLTFLoader();
-    this.loaders.textureLoader = new THREE.TextureLoader();
+    this.loaders.gltfLoader = new GLTFLoader(this.loadingManager);
+    this.loaders.textureLoader = new THREE.TextureLoader(this.loadingManager);
     // this.loaders.cubeTextureLoader = new THREE.CubeTextureLoader()
 
     const dracoLoader = new DRACOLoader();
