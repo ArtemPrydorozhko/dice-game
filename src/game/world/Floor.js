@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 
 export default class Floor {
-  constructor() {
+  constructor(textures) {
     this.mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(10, 10),
+      new THREE.PlaneGeometry(50, 50),
       new THREE.MeshStandardMaterial({
-        color: '#444444',
-        metalness: 0,
-        roughness: 0.5,
+        map: textures.colorTexture,
+        normalMap: textures.normalTexture,
+        aoMap: textures.armTexture,
+        roughnessMap: textures.armTexture,
+        metalnessMap: textures.armTexture,
       }),
     );
     this.mesh.receiveShadow = true;

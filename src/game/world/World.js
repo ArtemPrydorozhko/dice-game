@@ -25,15 +25,18 @@ export default class World {
   }
 
   async setWorld() {
-    this.floor = new Floor();
-    this.scene.add(this.floor.mesh);
-
     this.environment = new Environment();
     this.scene.add(this.environment.ambientLight);
     this.scene.add(this.environment.directionalLight);
     // this.scene.add(this.environment.cameraHelper);
-
-    [this.diceModel, this.boardModel] = await Promise.all([
+    this.floorTextures = {};
+    [
+      this.diceModel,
+      this.boardModel,
+      this.floorTextures.colorTexture,
+      this.floorTextures.armTexture,
+      this.floorTextures.normalTexture,
+    ] = await Promise.all([
       this.resourceLoader.load({
         type: 'gltfModel',
         path: urlBuilder.buildUrl('/models/dice/dice.glb'),
@@ -42,7 +45,27 @@ export default class World {
         type: 'gltfModel',
         path: urlBuilder.buildUrl('/models/board/board.glb'),
       }),
+      this.resourceLoader.load({
+        type: 'texture',
+        path: urlBuilder.buildUrl('/textures/floor/worn_planks_diff_2k.jpg'),
+      }),
+      this.resourceLoader.load({
+        type: 'texture',
+        path: urlBuilder.buildUrl('/textures/floor/worn_planks_arm_2k.jpg'),
+      }),
+      this.resourceLoader.load({
+        type: 'texture',
+        path: urlBuilder.buildUrl('/textures/floor/worn_planks_nor_gl_2k.png'),
+      }),
     ]);
+    this.floorTextures.colorTexture.colorSpace = THREE.SRGBColorSpace;
+    Object.values(this.floorTextures).forEach((texture) => {
+      texture.repeat.set(2, 2);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+    });
+    this.floor = new Floor(this.floorTextures);
+    this.scene.add(this.floor.mesh);
     this.board = new Board(this.boardModel);
     this.scene.add(this.board.object);
     this.physicWorld.addBody(this.board.body);
