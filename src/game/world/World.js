@@ -8,6 +8,7 @@ import Board from './Board.js';
 import Dice from './Dice.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
 import urlBuilder from '../utils/urlBuilder.js';
+import EventBus from '../utils/EventBus.js';
 
 export default class World {
   constructor() {
@@ -20,6 +21,7 @@ export default class World {
     this.physicalDices = new Set();
 
     this.events = new EventEmitter();
+    this.eventBus = EventBus.getInstance();
 
     this.setWorld();
   }
@@ -30,6 +32,16 @@ export default class World {
     this.scene.add(this.environment.directionalLight);
     // this.scene.add(this.environment.cameraHelper);
     this.floorTextures = {};
+    this.resourceLoader.loadingManager.onProgress = (
+      _url,
+      itemsLoaded,
+      itemsTotal,
+    ) => {
+      this.eventBus.emit('assetLoadingProgress', itemsLoaded / itemsTotal);
+    };
+    this.resourceLoader.loadingManager.onLoad = () => {
+      this.eventBus.emit('assetLoadingComplete');
+    };
     [
       this.diceModel,
       this.boardModel,
