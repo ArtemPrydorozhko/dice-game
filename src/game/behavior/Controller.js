@@ -5,6 +5,7 @@ import { MainMenu } from '../ui/MainMenu.js';
 import { ControllPanel } from '../ui/ControllPanel.js';
 import DiceCombination from './DiceCombination.js';
 import { EventEmitter } from '../utils/EventEmitter.js';
+import StateMachine from '../utils/StateMachine.js';
 
 const p1DicePositions = [
   { x: 6.3, y: 2.15, z: 2 },
@@ -32,18 +33,6 @@ export default class Controller {
     this.rollingDelay = 5000;
     this.events = new EventEmitter();
 
-    this.gameSteps = [
-      'Player 1 rolling',
-      'Player 2 rolling',
-      'Player 1 selecting',
-      'Player 1 rerolling',
-      'Player 2 selecting',
-      'Player 2 rerolling',
-      'Result',
-      'Restart',
-    ];
-    this.currentStep = 0;
-
     this.onWorldReady = this.startGame.bind(this);
     this.world.events.on('ready', this.onWorldReady);
 
@@ -58,6 +47,8 @@ export default class Controller {
     this.onSelectDice = this.selectDice.bind(this);
     this.userPointerHelper.events.on('click', this.onSelectDice);
 
+    this.setStateMachine();
+
     this.debug = Debug.getInstance();
     if (this.debug.active) {
       this.debugFolder = this.debug.ui.addFolder('Game Controller');
@@ -67,105 +58,180 @@ export default class Controller {
     }
   }
 
+  setStateMachine() {
+    this.states = {
+      Player1ToRoll: 'Player1ToRoll',
+      Player2ToRoll: 'Player2ToRoll',
+      Player1Rolling: 'Player1Rolling',
+      Player2Rolling: 'Player2Rolling',
+      Player1Selecting: 'Player1Selecting',
+      Player2Selecting: 'Player2Selecting',
+      Player1Rerolling: 'Player1Rerolling',
+      Player2Rerolling: 'Player2Rerolling',
+      EndOfRound: 'EndOfRound',
+      EndOfGame: 'EndOfGame',
+    };
+
+    this.triggers = {
+      PlayerRolled: 'PlayerRolled',
+      PlayerDicesLanded: 'PlayerDiceLanded',
+      PlayerSelected: 'PlayerSelected',
+      PlayerSkippedReroll: 'PlayerSkippedReroll',
+      RoundEnded: 'RoundEnded',
+      RoundStarted: 'RoundStarted',
+      GameEnded: 'GameEnded',
+    };
+
+    this.stateMachine = new StateMachine({
+      initialState: this.states.Player1ToRoll,
+      states: {
+        [this.states.Player1ToRoll]: {
+          on: {
+            [this.triggers.PlayerRolled]: {
+              target: this.states.Player1Rolling,
+            },
+          },
+          onEntry: () => {
+            this.p1Turn = true;
+            this.controllPanel.update('Player 1 turn', 'Roll');
+          },
+        },
+        [this.states.Player1Rolling]: {
+          on: {
+            [this.triggers.PlayerDicesLanded]: {
+              target: this.states.Player2ToRoll,
+            },
+          },
+          onEntry: async () => {
+            this.controllPanel.update('Player 1 rolling...');
+            await this.rollPlayerDices();
+            this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
+          },
+        },
+        [this.states.Player2ToRoll]: {
+          on: {
+            [this.triggers.PlayerRolled]: {
+              target: this.states.Player2Rolling,
+            },
+          },
+          onEntry: () => {
+            this.p1Turn = false;
+            this.controllPanel.update('Player 2 turn', 'Roll');
+          },
+        },
+        [this.states.Player2Rolling]: {
+          on: {
+            [this.triggers.PlayerDicesLanded]: {
+              target: this.states.Player1Selecting,
+            },
+          },
+          onEntry: async () => {
+            this.controllPanel.update('Player 2 rolling...');
+            await this.rollPlayerDices();
+            this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
+          },
+        },
+        [this.states.Player1Selecting]: {
+          on: {
+            [this.triggers.PlayerSelected]: {
+              target: this.states.Player1Rerolling,
+            },
+            [this.triggers.PlayerSkippedReroll]: {
+              target: this.states.Player2Selecting,
+            },
+          },
+          onEntry: () => {
+            this.p1Turn = true;
+            this.controllPanel.update(
+              'Player 1 selecting dices to reroll...',
+              'Reroll selected',
+            );
+          },
+        },
+        [this.states.Player1Rerolling]: {
+          on: {
+            [this.triggers.PlayerDicesLanded]: {
+              target: this.states.Player2Selecting,
+            },
+          },
+          onEntry: async () => {
+            this.controllPanel.update('Player 1 rerolling...');
+            await this.rollSelectedDices();
+            this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
+          },
+        },
+        [this.states.Player2Selecting]: {
+          on: {
+            [this.triggers.PlayerSelected]: {
+              target: this.states.Player2Rerolling,
+            },
+            [this.triggers.PlayerSkippedReroll]: {
+              target: this.states.EndOfRound,
+            },
+          },
+          onEntry: () => {
+            this.p1Turn = false;
+            this.controllPanel.update(
+              'Player 2 selecting dices to reroll...',
+              'Reroll selected',
+            );
+          },
+        },
+        [this.states.Player2Rerolling]: {
+          on: {
+            [this.triggers.PlayerDicesLanded]: {
+              target: this.states.EndOfRound,
+            },
+          },
+          onEntry: async () => {
+            this.controllPanel.update('Player 2 rerolling...');
+            await this.rollSelectedDices();
+            this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
+          },
+        },
+        [this.states.EndOfRound]: {
+          on: {
+            [this.triggers.GameEnded]: { target: this.states.EndOfGame },
+            [this.triggers.RoundEnded]: { target: this.states.Player1ToRoll },
+          },
+          onEntry: () => {
+            this.endRound();
+          },
+          onExit: () => {
+            this.removePlayerDices();
+          },
+        },
+      },
+    });
+  }
+
   startGame() {
     this.mainMenu.open();
   }
 
   async play1() {
-    this.currentStep = -1;
     this.mainMenu.close();
-    this.controllPanel.update('Player 1 turn', 'Roll');
     this.controllPanel.open();
   }
 
-  async nextAction() {
-    this.currentStep++;
-    const currentState = this.gameSteps[this.currentStep];
-
-    if (currentState === 'Player 1 rolling') {
-      this.p1Turn = true;
-      this.controllPanel.update('Player 1 rolling...');
-      await this.rollPlayerDices();
-      this.controllPanel.update('Player 2 turn', 'Roll');
-      return;
-    }
-
-    if (currentState === 'Player 2 rolling') {
-      this.p1Turn = false;
-      this.controllPanel.update('Player 2 rolling...');
-      await this.rollPlayerDices();
-      this.nextAction();
-      return;
-    }
-
-    if (currentState === 'Player 1 selecting') {
-      this.p1Turn = true;
-      this.controllPanel.update(
-        'Player 1 selecting dices to reroll...',
-        'Reroll selected',
-      );
-      return;
-    }
-
-    if (currentState === 'Player 1 rerolling') {
-      if (this.selectedDices.size === 0) {
-        this.nextAction();
-        return;
-      }
-
-      this.p1Turn = true;
-      this.controllPanel.update('Player 1 rerolling...');
-      await this.rollSelectedDices();
-      this.nextAction();
-      return;
-    }
-
-    if (currentState === 'Player 2 selecting') {
-      this.p1Turn = false;
-      this.controllPanel.update(
-        'Player 2 selecting dices to reroll...',
-        'Reroll selected',
-      );
-      return;
-    }
-
-    if (currentState === 'Player 2 rerolling') {
-      if (this.selectedDices.size === 0) {
-        this.nextAction();
-        return;
-      }
-
-      this.p1Turn = false;
-      this.controllPanel.update('Player 2 rerolling...');
-      await this.rollSelectedDices();
-      this.nextAction();
-
-      return;
-    }
-
-    if (currentState === 'Result') {
-      const p1Faces = this.p1Dices.map((dice) => dice.getTopFace());
-      const p2Faces = this.p2Dices.map((dice) => dice.getTopFace());
-      const p1Combination = new DiceCombination(p1Faces);
-      const p2Combination = new DiceCombination(p2Faces);
-      const result = DiceCombination.compareCombinations(
-        p1Combination,
-        p2Combination,
-      );
-      const resultText =
-        result === 1
-          ? 'Player 1 wins'
-          : result === -1
-            ? 'Player 2 wins'
-            : 'Draw';
-      this.controllPanel.update(resultText, 'Play again');
-      return;
-    }
-
-    if (currentState === 'Restart') {
-      this.removePlayerDices();
-      this.play1();
-      return;
+  nextAction() {
+    const currentState = this.stateMachine.state;
+    switch (currentState) {
+      case this.states.Player1ToRoll:
+      case this.states.Player2ToRoll:
+        this.stateMachine.trigger(this.triggers.PlayerRolled);
+        break;
+      case this.states.Player1Selecting:
+      case this.states.Player2Selecting:
+        if (this.selectedDices.size === 0) {
+          this.stateMachine.trigger(this.triggers.PlayerSkippedReroll);
+        } else {
+          this.stateMachine.trigger(this.triggers.PlayerSelected);
+        }
+        break;
+      case this.states.EndOfRound:
+        this.stateMachine.trigger(this.triggers.RoundEnded);
+        break;
     }
   }
 
@@ -293,10 +359,10 @@ export default class Controller {
   }
 
   selectDice() {
-    const currentState = this.gameSteps[this.currentStep];
+    const currentState = this.stateMachine.state;
     if (
-      currentState !== 'Player 1 selecting' &&
-      currentState !== 'Player 2 selecting'
+      currentState !== this.states.Player1Selecting &&
+      currentState !== this.states.Player2Selecting
     ) {
       return;
     }
@@ -322,5 +388,19 @@ export default class Controller {
     this.renderer.setSelecteObjects(
       Array.from(this.selectedDices).map((dice) => dice.object),
     );
+  }
+
+  endRound() {
+    const p1Faces = this.p1Dices.map((dice) => dice.getTopFace());
+    const p2Faces = this.p2Dices.map((dice) => dice.getTopFace());
+    const p1Combination = new DiceCombination(p1Faces);
+    const p2Combination = new DiceCombination(p2Faces);
+    const result = DiceCombination.compareCombinations(
+      p1Combination,
+      p2Combination,
+    );
+    const resultText =
+      result === 1 ? 'Player 1 wins' : result === -1 ? 'Player 2 wins' : 'Draw';
+    this.controllPanel.update(resultText, 'Play again');
   }
 }
