@@ -1,11 +1,10 @@
 import * as CANNON from 'cannon-es';
 import Debug from '../utils/Debug.js';
 import { wait } from '../utils/time.js';
-import { MainMenu } from '../ui/MainMenu.js';
 import { ControllPanel } from '../ui/ControllPanel.js';
 import DiceCombination from './DiceCombination.js';
-import { EventEmitter } from '../utils/EventEmitter.js';
 import StateMachine from '../utils/StateMachine.js';
+import EventBus from '../utils/EventBus.js';
 
 const p1DicePositions = [
   { x: 6.3, y: 2.15, z: 2 },
@@ -31,14 +30,13 @@ export default class Controller {
     this.p2Dices = [];
     this.selectedDices = new Set();
     this.rollingDelay = 5000;
-    this.events = new EventEmitter();
+    this.eventBus = EventBus.getInstance();
 
     this.onWorldReady = this.startGame.bind(this);
     this.world.events.on('ready', this.onWorldReady);
 
-    this.mainMenu = new MainMenu();
     this.onPlay1 = this.play1.bind(this);
-    this.mainMenu.events.on('play1', this.onPlay1);
+    this.eventBus.on('play1', this.onPlay1);
 
     this.controllPanel = new ControllPanel();
     this.onAction = this.nextAction.bind(this);
@@ -206,11 +204,11 @@ export default class Controller {
   }
 
   startGame() {
-    this.mainMenu.open();
+    this.eventBus.emit('openMainMenu');
   }
 
   async play1() {
-    this.mainMenu.close();
+    this.eventBus.emit('closeMainMenu');
     this.controllPanel.open();
   }
 
