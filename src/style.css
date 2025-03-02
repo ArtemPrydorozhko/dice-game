@@ -39,39 +39,3 @@ body {
   height: 15px;
   background: darkgrey;
 }
-
-/* Menu start */
-
-.main-menu {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(255, 255, 255, 0.8);
-  width: 400px;
-  padding: 50px 30px;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  flex-direction: column;
-  gap: 10px;
-  z-index: 1;
-}
-
-.main-menu--opened {
-  display: flex;
-}
-
-.main-menu--closed {
-  display: none;
-}
-
-.main-menu--opened + .main-menu-backdrop {
-  position: absolute;
-  width: 100vw;
-  height: 100vh;
-}
-
-.main-menu__button {
-  width: 100%;
-  height: 30px;
-}
