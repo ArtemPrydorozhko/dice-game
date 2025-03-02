@@ -1,3 +1,3 @@
-import GlobalLoadingOverlay from './GlobalLoadingOverlay';
+import GlobalLoadingOverlay from './globalLoadingOverlay/GlobalLoadingOverlay';
 
 GlobalLoadingOverlay();
