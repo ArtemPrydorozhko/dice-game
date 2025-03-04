@@ -22,13 +22,17 @@ const restrictionWallpositions = [
 ];
 
 export default class Board {
-  constructor(model) {
+  constructor(model, physicMaterial) {
     this.object = model.scene.children[0].clone();
     this.object.castShadow = true;
     this.object.receiveShadow = true;
 
     const plane = new CANNON.Plane();
-    this.body = new CANNON.Body({ mass: 0, shape: plane });
+    this.body = new CANNON.Body({
+      mass: 0,
+      shape: plane,
+      material: physicMaterial,
+    });
     this.body.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
     this.body.position.y = 1;
 
