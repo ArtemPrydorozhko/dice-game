@@ -26,11 +26,11 @@ class EventBus {
     );
   }
 
-  emit(event, data) {
+  emit(event, ...data) {
     if (!this.listeners[event]) {
       return;
     }
-    this.listeners[event].forEach((listener) => listener(data));
+    this.listeners[event].forEach((listener) => listener(...data));
   }
 }
 

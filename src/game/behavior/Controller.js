@@ -1,7 +1,6 @@
 import * as CANNON from 'cannon-es';
 import Debug from '../utils/Debug.js';
 import { wait } from '../utils/time.js';
-import { ControllPanel } from '../ui/ControllPanel.js';
 import DiceCombination from './DiceCombination.js';
 import StateMachine from '../utils/StateMachine.js';
 import EventBus from '../utils/EventBus.js';
@@ -38,9 +37,8 @@ export default class Controller {
     this.onPlay1 = this.play1.bind(this);
     this.eventBus.on('play1', this.onPlay1);
 
-    this.controllPanel = new ControllPanel();
     this.onAction = this.nextAction.bind(this);
-    this.controllPanel.events.on('action', this.onAction);
+    this.eventBus.on('controllPanel.action', this.onAction);
 
     this.onSelectDice = this.selectDice.bind(this);
     this.userPointerHelper.events.on('click', this.onSelectDice);
@@ -58,6 +56,7 @@ export default class Controller {
 
   setStateMachine() {
     this.states = {
+      Preparation: 'Preparation',
       Player1ToRoll: 'Player1ToRoll',
       Player2ToRoll: 'Player2ToRoll',
       Player1Rolling: 'Player1Rolling',
@@ -81,8 +80,15 @@ export default class Controller {
     };
 
     this.stateMachine = new StateMachine({
-      initialState: this.states.Player1ToRoll,
+      initialState: this.states.Preparation,
       states: {
+        [this.states.Preparation]: {
+          on: {
+            [this.triggers.RoundStarted]: {
+              target: this.states.Player1ToRoll,
+            },
+          },
+        },
         [this.states.Player1ToRoll]: {
           on: {
             [this.triggers.PlayerRolled]: {
@@ -91,7 +97,11 @@ export default class Controller {
           },
           onEntry: () => {
             this.p1Turn = true;
-            this.controllPanel.update('Player 1 turn', 'Roll');
+            this.eventBus.emit(
+              'controllPanel.updateContent',
+              'Player 1 turn',
+              'Roll',
+            );
           },
         },
         [this.states.Player1Rolling]: {
@@ -101,7 +111,10 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.controllPanel.update('Player 1 rolling...');
+            this.eventBus.emit(
+              'controllPanel.updateContent',
+              'Player 1 rolling...',
+            );
             await this.rollPlayerDices();
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
@@ -114,7 +127,11 @@ export default class Controller {
           },
           onEntry: () => {
             this.p1Turn = false;
-            this.controllPanel.update('Player 2 turn', 'Roll');
+            this.eventBus.emit(
+              'controllPanel.updateContent',
+              'Player 2 turn',
+              'Roll',
+            );
           },
         },
         [this.states.Player2Rolling]: {
@@ -124,7 +141,10 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.controllPanel.update('Player 2 rolling...');
+            this.eventBus.emit(
+              'controllPanel.updateContent',
+              'Player 2 rolling...',
+            );
             await this.rollPlayerDices();
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
@@ -140,7 +160,8 @@ export default class Controller {
           },
           onEntry: () => {
             this.p1Turn = true;
-            this.controllPanel.update(
+            this.eventBus.emit(
+              'controllPanel.updateContent',
               'Player 1 selecting dices to reroll...',
               'Reroll selected',
             );
@@ -153,7 +174,10 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.controllPanel.update('Player 1 rerolling...');
+            this.eventBus.emit(
+              'controllPanel.updateContent',
+              'Player 1 rerolling...',
+            );
             await this.rollSelectedDices();
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
@@ -169,7 +193,8 @@ export default class Controller {
           },
           onEntry: () => {
             this.p1Turn = false;
-            this.controllPanel.update(
+            this.eventBus.emit(
+              'controllPanel.updateContent',
               'Player 2 selecting dices to reroll...',
               'Reroll selected',
             );
@@ -182,7 +207,10 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.controllPanel.update('Player 2 rerolling...');
+            this.eventBus.emit(
+              'controllPanel.updateContent',
+              'Player 2 rerolling...',
+            );
             await this.rollSelectedDices();
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
@@ -209,7 +237,8 @@ export default class Controller {
 
   async play1() {
     this.eventBus.emit('closeMainMenu');
-    this.controllPanel.open();
+    this.eventBus.emit('controllPanel.show');
+    this.stateMachine.trigger(this.triggers.RoundStarted);
   }
 
   nextAction() {
@@ -399,6 +428,6 @@ export default class Controller {
     );
     const resultText =
       result === 1 ? 'Player 1 wins' : result === -1 ? 'Player 2 wins' : 'Draw';
-    this.controllPanel.update(resultText, 'Play again');
+    this.eventBus.emit('controllPanel.updateContent', resultText, 'Play again');
   }
 }

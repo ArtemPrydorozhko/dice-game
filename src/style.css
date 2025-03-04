@@ -15,7 +15,6 @@ html,
 body {
   overflow: hidden;
   background-color: rgba(0, 0, 0, 1);
-  line-height: 1.5;
 }
 
 .webgl {
@@ -23,28 +22,4 @@ body {
   top: 0;
   left: 0;
   outline: none;
-}
-
-.controll-panel {
-  position: absolute;
-  bottom: 0;
-  background-color: wheat;
-  height: 130px;
-  width: 400px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.controll-panel__player {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.controll-panel__player-round {
-  border: 1px solid black;
-  border-radius: 50%;
-  width: 15px;
-  height: 15px;
-  background: darkgrey;
 }
