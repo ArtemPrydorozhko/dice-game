@@ -29,7 +29,7 @@ const faceVectors = [
 ];
 
 export default class Dice {
-  constructor(model, physics) {
+  constructor(model, physics, physicMaterial) {
     this.physics = physics;
     this.object = model.scene.children[0].clone();
     this.object.scale.setScalar(0.35);
@@ -42,7 +42,11 @@ export default class Dice {
 
     if (physics) {
       const shape = new CANNON.Box(new CANNON.Vec3(0.35, 0.35, 0.35));
-      this.body = new CANNON.Body({ mass: 0.75, shape: shape });
+      this.body = new CANNON.Body({
+        mass: 0.75,
+        shape,
+        material: physicMaterial,
+      });
       this.body.position.copy(this.object.position);
       this.body.quaternion.copy(this.object.quaternion);
     }

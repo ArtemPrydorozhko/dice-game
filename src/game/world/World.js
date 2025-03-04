@@ -17,6 +17,26 @@ export default class World {
 
     this.physicWorld = new CANNON.World();
     this.physicWorld.gravity.set(0, -9.82, 0);
+    this.physicDiceMaterial = new CANNON.Material('diceMaterial');
+    const physicDiceContactMaterial = new CANNON.ContactMaterial(
+      this.physicDiceMaterial,
+      this.physicDiceMaterial,
+      {
+        friction: 0.03,
+        restitution: 0.2,
+      },
+    );
+    this.physicWorld.addContactMaterial(physicDiceContactMaterial);
+    this.physicBoardMaterial = new CANNON.Material('boardMaterial');
+    const physicBoardContactMaterial = new CANNON.ContactMaterial(
+      this.physicDiceMaterial,
+      this.physicBoardMaterial,
+      {
+        friction: 0.1,
+        restitution: 0.5,
+      },
+    );
+    this.physicWorld.addContactMaterial(physicBoardContactMaterial);
 
     this.physicalDices = new Set();
 
@@ -78,7 +98,7 @@ export default class World {
     });
     this.floor = new Floor(this.floorTextures);
     this.scene.add(this.floor.mesh);
-    this.board = new Board(this.boardModel);
+    this.board = new Board(this.boardModel, this.physicBoardMaterial);
     this.scene.add(this.board.object);
     this.physicWorld.addBody(this.board.body);
     this.board.restrictionWalls.forEach((wall) => {
@@ -89,7 +109,7 @@ export default class World {
   }
 
   createDice(physics = true) {
-    const dice = new Dice(this.diceModel, physics);
+    const dice = new Dice(this.diceModel, physics, this.physicDiceMaterial);
     this.scene.add(dice.object);
     if (physics) {
       this.physicWorld.addBody(dice.body);
