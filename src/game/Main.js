@@ -87,6 +87,7 @@ export default class Main {
 
   destroy() {
     this.listeners.forEach((unsubscribe) => unsubscribe());
+    this.world.listeners.forEach((unsubscribe) => unsubscribe());
 
     this.world.scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {

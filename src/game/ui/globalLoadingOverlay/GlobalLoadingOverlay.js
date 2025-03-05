@@ -15,7 +15,14 @@ class GlobalLoadingOverlay extends HTMLElement {
       <div class="loading-overlay-bar-outer">
         <div class="loading-overlay-bar-inner"></div>
       </div>
+      <button class="loading-overlay-button">Play</button>
     `;
+
+    this.loadingBar = this.shadowRoot.querySelector(
+      '.loading-overlay-bar-outer',
+    );
+    this.button = this.shadowRoot.querySelector('.loading-overlay-button');
+    this.button.classList.add('hidden');
   }
 
   connectedCallback() {
@@ -36,6 +43,12 @@ class GlobalLoadingOverlay extends HTMLElement {
         onAssetLoadingComplete,
       );
     });
+
+    const onButtonClick = this.onButtonClick.bind(this);
+    this.button.addEventListener('click', onButtonClick);
+    this.listeners.push(() => {
+      this.button.removeEventListener('click', onButtonClick);
+    });
   }
 
   disconnectedCallback() {
@@ -52,7 +65,13 @@ class GlobalLoadingOverlay extends HTMLElement {
   }
 
   onAssetLoadingComplete() {
+    this.loadingBar.classList.add('hidden');
+    this.button.classList.remove('hidden');
+  }
+
+  onButtonClick() {
     this.shadowRoot.host.classList.add('hidden');
+    this.eventBus.emit('loadingOverlay.removed');
   }
 }
 

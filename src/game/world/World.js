@@ -13,6 +13,7 @@ import EventBus from '../utils/EventBus.js';
 export default class World {
   constructor(camera) {
     this.camera = camera;
+    this.listeners = [];
     this.scene = new THREE.Scene();
     this.resourceLoader = new ResourceLoader();
 
@@ -70,8 +71,12 @@ export default class World {
     this.backgroundMusic.setBuffer(this.backgroundMusicBuffer);
     this.backgroundMusic.setLoop(true);
     this.backgroundMusic.setVolume(0.5);
-    this.backgroundMusic.play();
-    this.events.emit('ready');
+
+    const start = this.start.bind(this);
+    this.eventBus.on('loadingOverlay.removed', start);
+    this.listeners.push(() => {
+      this.eventBus.removeListener('loadingOverlay.removed', start);
+    });
   }
 
   createDice(physics = true) {
@@ -98,6 +103,11 @@ export default class World {
     this.physicalDices.forEach((dice) => {
       dice.syncWithPhysics();
     });
+  }
+
+  start() {
+    this.backgroundMusic.play();
+    this.events.emit('ready');
   }
 
   async loadResources() {
