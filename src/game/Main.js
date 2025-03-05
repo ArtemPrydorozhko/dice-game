@@ -30,8 +30,8 @@ export default class Main {
 
     this.debug = Debug.getInstance();
 
-    this.world = new World();
     this.camera = new Camera(this.canvas, this.width, this.height);
+    this.world = new World(this.camera);
     this.renderer = new Renderer(
       this.canvas,
       this.width,

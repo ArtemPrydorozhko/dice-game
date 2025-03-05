@@ -1,4 +1,5 @@
 import EventBus from '../../utils/EventBus';
+import urlBuilder from '../../utils/urlBuilder';
 import styles from './mainMenu.css?inline';
 
 class MainMenu extends HTMLElement {
@@ -21,6 +22,9 @@ class MainMenu extends HTMLElement {
             </div>
         </div>
     `;
+
+    this.hoverSound = new Audio(urlBuilder.buildUrl('/sounds/menu-hover.mp3'));
+    this.clickSound = new Audio(urlBuilder.buildUrl('/sounds/menu-click.mp3'));
   }
 
   connectedCallback() {
@@ -41,6 +45,24 @@ class MainMenu extends HTMLElement {
     this.eventBus.on('closeMainMenu', onCloseMainMenu);
     this.listeners.push(() => {
       this.eventBus.removeListener('closeMainMenu', onCloseMainMenu);
+    });
+
+    this.shadowRoot.querySelectorAll('.main-menu__button').forEach((button) => {
+      const onHover = () => {
+        this.hoverSound.play();
+      };
+      button.addEventListener('mouseenter', onHover);
+      this.listeners.push(() => {
+        button.removeEventListener('mouseenter', onHover);
+      });
+
+      const onClick = () => {
+        this.clickSound.play();
+      };
+      button.addEventListener('click', onClick);
+      this.listeners.push(() => {
+        button.removeEventListener('click', onClick);
+      });
     });
   }
 
