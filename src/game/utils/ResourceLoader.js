@@ -9,6 +9,7 @@ export default class ResourceLoader {
     this.loaders = {};
     this.loaders.gltfLoader = new GLTFLoader(this.loadingManager);
     this.loaders.textureLoader = new THREE.TextureLoader(this.loadingManager);
+    this.loaders.audioLoader = new THREE.AudioLoader(this.loadingManager);
     // this.loaders.cubeTextureLoader = new THREE.CubeTextureLoader()
 
     const dracoLoader = new DRACOLoader();
@@ -18,6 +19,7 @@ export default class ResourceLoader {
     this.loaderMap = {
       gltfModel: this.loaders.gltfLoader,
       texture: this.loaders.textureLoader,
+      audio: this.loaders.audioLoader,
     };
   }
 

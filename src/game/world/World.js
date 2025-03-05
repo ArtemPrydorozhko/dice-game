@@ -11,7 +11,8 @@ import urlBuilder from '../utils/urlBuilder.js';
 import EventBus from '../utils/EventBus.js';
 
 export default class World {
-  constructor() {
+  constructor(camera) {
+    this.camera = camera;
     this.scene = new THREE.Scene();
     this.resourceLoader = new ResourceLoader();
 
@@ -51,51 +52,9 @@ export default class World {
     this.scene.add(this.environment.ambientLight);
     this.scene.add(this.environment.directionalLight);
     // this.scene.add(this.environment.cameraHelper);
-    this.floorTextures = {};
-    this.resourceLoader.loadingManager.onProgress = (
-      _url,
-      itemsLoaded,
-      itemsTotal,
-    ) => {
-      this.eventBus.emit('assetLoadingProgress', itemsLoaded / itemsTotal);
-    };
-    this.resourceLoader.loadingManager.onLoad = () => {
-      this.eventBus.emit('assetLoadingComplete');
-    };
-    [
-      this.diceModel,
-      this.boardModel,
-      this.floorTextures.colorTexture,
-      this.floorTextures.armTexture,
-      this.floorTextures.normalTexture,
-    ] = await Promise.all([
-      this.resourceLoader.load({
-        type: 'gltfModel',
-        path: urlBuilder.buildUrl('/models/dice/dice.glb'),
-      }),
-      this.resourceLoader.load({
-        type: 'gltfModel',
-        path: urlBuilder.buildUrl('/models/board/board.glb'),
-      }),
-      this.resourceLoader.load({
-        type: 'texture',
-        path: urlBuilder.buildUrl('/textures/floor/worn_planks_diff_2k.jpg'),
-      }),
-      this.resourceLoader.load({
-        type: 'texture',
-        path: urlBuilder.buildUrl('/textures/floor/worn_planks_arm_2k.jpg'),
-      }),
-      this.resourceLoader.load({
-        type: 'texture',
-        path: urlBuilder.buildUrl('/textures/floor/worn_planks_nor_gl_2k.png'),
-      }),
-    ]);
-    this.floorTextures.colorTexture.colorSpace = THREE.SRGBColorSpace;
-    Object.values(this.floorTextures).forEach((texture) => {
-      texture.repeat.set(2, 2);
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-    });
+
+    await this.loadResources();
+
     this.floor = new Floor(this.floorTextures);
     this.scene.add(this.floor.mesh);
     this.board = new Board(this.boardModel, this.physicBoardMaterial);
@@ -105,6 +64,13 @@ export default class World {
       this.physicWorld.addBody(wall);
     });
 
+    const listener = new THREE.AudioListener();
+    this.camera.threeJSCamera.add(listener);
+    this.backgroundMusic = new THREE.Audio(listener);
+    this.backgroundMusic.setBuffer(this.backgroundMusicBuffer);
+    this.backgroundMusic.setLoop(true);
+    this.backgroundMusic.setVolume(0.5);
+    this.backgroundMusic.play();
     this.events.emit('ready');
   }
 
@@ -131,6 +97,63 @@ export default class World {
     this.physicWorld.fixedStep();
     this.physicalDices.forEach((dice) => {
       dice.syncWithPhysics();
+    });
+  }
+
+  async loadResources() {
+    this.resourceLoader.loadingManager.onProgress = (
+      _url,
+      itemsLoaded,
+      itemsTotal,
+    ) => {
+      this.eventBus.emit('assetLoadingProgress', itemsLoaded / itemsTotal);
+    };
+    this.resourceLoader.loadingManager.onLoad = () => {
+      setTimeout(() => {
+        this.eventBus.emit('assetLoadingComplete');
+      }, 500);
+    };
+
+    this.floorTextures = {};
+    [
+      this.diceModel,
+      this.boardModel,
+      this.floorTextures.colorTexture,
+      this.floorTextures.armTexture,
+      this.floorTextures.normalTexture,
+      this.backgroundMusicBuffer,
+    ] = await Promise.all([
+      this.resourceLoader.load({
+        type: 'gltfModel',
+        path: urlBuilder.buildUrl('/models/dice/dice.glb'),
+      }),
+      this.resourceLoader.load({
+        type: 'gltfModel',
+        path: urlBuilder.buildUrl('/models/board/board.glb'),
+      }),
+      this.resourceLoader.load({
+        type: 'texture',
+        path: urlBuilder.buildUrl('/textures/floor/worn_planks_diff_2k.jpg'),
+      }),
+      this.resourceLoader.load({
+        type: 'texture',
+        path: urlBuilder.buildUrl('/textures/floor/worn_planks_arm_2k.jpg'),
+      }),
+      this.resourceLoader.load({
+        type: 'texture',
+        path: urlBuilder.buildUrl('/textures/floor/worn_planks_nor_gl_2k.png'),
+      }),
+      this.resourceLoader.load({
+        type: 'audio',
+        path: urlBuilder.buildUrl('/sounds/background-music.mp3'),
+      }),
+    ]);
+
+    this.floorTextures.colorTexture.colorSpace = THREE.SRGBColorSpace;
+    Object.values(this.floorTextures).forEach((texture) => {
+      texture.repeat.set(2, 2);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
     });
   }
 }
