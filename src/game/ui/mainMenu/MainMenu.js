@@ -49,6 +49,7 @@ class MainMenu extends HTMLElement {
 
     this.shadowRoot.querySelectorAll('.main-menu__button').forEach((button) => {
       const onHover = () => {
+        this.hoverSound.currentTime = 0;
         this.hoverSound.play();
       };
       button.addEventListener('mouseenter', onHover);
