@@ -29,7 +29,7 @@ const faceVectors = [
 ];
 
 export default class Dice {
-  constructor(model, physics, physicMaterial) {
+  constructor(model, physics, physicMaterial, boardHitSound, diceHitSound) {
     this.physics = physics;
     this.object = model.scene.children[0].clone();
     this.object.scale.setScalar(0.35);
@@ -39,6 +39,7 @@ export default class Dice {
       child.castShadow = true;
       child.receiveShadow = true;
     });
+    this.listeners = [];
 
     if (physics) {
       const shape = new CANNON.Box(new CANNON.Vec3(0.35, 0.35, 0.35));
@@ -49,7 +50,48 @@ export default class Dice {
       });
       this.body.position.copy(this.object.position);
       this.body.quaternion.copy(this.object.quaternion);
+
+      this.boardHitSound = boardHitSound;
+      this.diceHitSound = diceHitSound;
+
+      const onCollide = this.onCollide.bind(this);
+      this.body.addEventListener('collide', onCollide);
+      this.listeners.push(() => {
+        this.body.removeEventListener('collide', onCollide);
+      });
     }
+  }
+
+  onCollide(collision) {
+    if (
+      collision.body.material?.name !== 'boardMaterial' &&
+      collision.body.material?.name !== 'diceMaterial'
+    ) {
+      return;
+    }
+
+    const maxImpact = 5;
+    const minImpact = 1;
+    const impact = Math.min(
+      collision.contact.getImpactVelocityAlongNormal(),
+      maxImpact,
+    );
+    if (impact < minImpact) {
+      return;
+    }
+
+    // normalize to [1, 0.1] range
+    const normalizedImpact =
+      ((impact - minImpact) / (maxImpact - minImpact)) * 0.9 + 0.1;
+
+    const impactSound =
+      collision.body.material.name === 'boardMaterial'
+        ? this.boardHitSound
+        : this.diceHitSound;
+
+    impactSound.currentTime = 0;
+    impactSound.volume = normalizedImpact;
+    impactSound.play();
   }
 
   getTopFace() {
@@ -92,5 +134,6 @@ export default class Dice {
       child.geometry.dispose();
       child.material.dispose();
     });
+    this.listeners.forEach((removeListener) => removeListener());
   }
 }

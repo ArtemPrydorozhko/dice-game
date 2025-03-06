@@ -23,6 +23,7 @@ const restrictionWallpositions = [
 
 export default class Board {
   constructor(model, physicMaterial) {
+    this.physicMaterial = physicMaterial;
     this.object = model.scene.children[0].clone();
     this.object.castShadow = true;
     this.object.receiveShadow = true;
@@ -50,7 +51,11 @@ export default class Board {
         position.sizeZ / 2 || size / 2,
       );
       const boxShape = new CANNON.Box(halfExtents);
-      const boxBody = new CANNON.Body({ mass: 0, shape: boxShape });
+      const boxBody = new CANNON.Body({
+        mass: 0,
+        shape: boxShape,
+        material: this.physicMaterial,
+      });
       this.restrictionWalls.push(boxBody);
 
       // show restriction walls

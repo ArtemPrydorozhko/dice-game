@@ -35,7 +35,7 @@ export default class World {
       this.physicBoardMaterial,
       {
         friction: 0.1,
-        restitution: 0.5,
+        restitution: 0.6,
       },
     );
     this.physicWorld.addContactMaterial(physicBoardContactMaterial);
@@ -80,7 +80,13 @@ export default class World {
   }
 
   createDice(physics = true) {
-    const dice = new Dice(this.diceModel, physics, this.physicDiceMaterial);
+    const dice = new Dice(
+      this.diceModel,
+      physics,
+      this.physicDiceMaterial,
+      this.diceHitboardSound,
+      this.diceHitDiceSound,
+    );
     this.scene.add(dice.object);
     if (physics) {
       this.physicWorld.addBody(dice.body);
@@ -111,6 +117,9 @@ export default class World {
   }
 
   async loadResources() {
+    this.diceHitboardSound = new Audio('/sounds/dice-hit-board.mp3');
+    this.diceHitDiceSound = new Audio('/sounds/dice-hit-dice.mp3');
+
     this.resourceLoader.loadingManager.onProgress = (
       _url,
       itemsLoaded,

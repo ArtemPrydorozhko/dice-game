@@ -14,7 +14,7 @@ export default class Renderer {
     this.webGLRenderer.toneMappingExposure = 1.75;
     this.webGLRenderer.shadowMap.enabled = true;
     this.webGLRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.webGLRenderer.setClearColor('#211d20');
+    this.webGLRenderer.setClearColor('#000');
     this.webGLRenderer.setSize(width, height);
     this.webGLRenderer.setPixelRatio(pixelRatio);
 
