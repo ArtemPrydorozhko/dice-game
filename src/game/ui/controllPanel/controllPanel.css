@@ -20,7 +20,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: 1fr;
-  grid-template-areas: '. description action';
+  grid-template-areas: 'players description action';
   width: 100%;
   height: 80px;
   background: rgba(165, 165, 165, 0.6);
@@ -42,12 +42,29 @@
 }
 
 .controll-panel__action-desciption {
+  grid-area: description;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #000;
   font-size: 30px;
-  grid-area: description;
+  text-align: center;
+}
+
+.controll-panel__players {
+  grid-area: players;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 30px;
+}
+
+@media (min-width: 768px) {
+  .controll-panel__players {
+    flex-direction: row;
+  }
 }
 
 .controll-panel__player {
@@ -56,10 +73,38 @@
   gap: 5px;
 }
 
+@media (min-width: 768px) {
+  .controll-panel__player:nth-child(1)::after {
+    content: '';
+    width: 2px;
+    height: 30px;
+    background-color: #000;
+  }
+
+  .controll-panel__player:nth-child(2) {
+    flex-direction: row-reverse;
+  }
+}
+
+.controll-panel__player-rounds {
+  display: flex;
+  gap: 5px;
+}
+
+@media (min-width: 768px) {
+  .controll-panel__player:nth-child(1) .controll-panel__player-rounds {
+    flex-direction: row-reverse;
+  }
+}
+
 .controll-panel__player-round {
-  border: 1px solid black;
-  border-radius: 50%;
-  width: 15px;
-  height: 15px;
-  background: darkgrey;
+  border: 1px solid #505050;
+  width: 10px;
+  height: 25px;
+  background: #989898;
+}
+
+.controll-panel__player-round--won {
+  background: #d6ff00;
+  border: none;
 }

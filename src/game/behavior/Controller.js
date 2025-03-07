@@ -43,6 +43,10 @@ export default class Controller {
     this.onSelectDice = this.selectDice.bind(this);
     this.userPointerHelper.events.on('click', this.onSelectDice);
 
+    this.p1RoundsWon = 0;
+    this.p2RoundsWon = 0;
+    this.rounds = 3;
+
     this.setStateMachine();
 
     this.debug = Debug.getInstance();
@@ -96,6 +100,7 @@ export default class Controller {
             },
           },
           onEntry: () => {
+            this.removePlayerDices();
             this.p1Turn = true;
             this.eventBus.emit(
               'controllPanel.updateContent',
@@ -218,13 +223,21 @@ export default class Controller {
         [this.states.EndOfRound]: {
           on: {
             [this.triggers.GameEnded]: { target: this.states.EndOfGame },
-            [this.triggers.RoundEnded]: { target: this.states.Player1ToRoll },
+            [this.triggers.RoundStarted]: { target: this.states.Player1ToRoll },
           },
           onEntry: () => {
             this.endRound();
           },
+        },
+        [this.states.EndOfGame]: {
+          on: {
+            [this.triggers.RoundStarted]: { target: this.states.Player1ToRoll },
+          },
           onExit: () => {
             this.removePlayerDices();
+            this.p1RoundsWon = 0;
+            this.p2RoundsWon = 0;
+            this.eventBus.emit('controllPanel.resetRounds');
           },
         },
       },
@@ -257,7 +270,10 @@ export default class Controller {
         }
         break;
       case this.states.EndOfRound:
-        this.stateMachine.trigger(this.triggers.RoundEnded);
+        this.stateMachine.trigger(this.triggers.RoundStarted);
+        break;
+      case this.states.EndOfGame:
+        this.stateMachine.trigger(this.triggers.RoundStarted);
         break;
     }
   }
@@ -426,8 +442,43 @@ export default class Controller {
       p1Combination,
       p2Combination,
     );
+    if (result === 1 || result === 0) {
+      this.p1RoundsWon++;
+    }
+    if (result === -1 || result === 0) {
+      this.p2RoundsWon++;
+    }
+
+    this.eventBus.emit(
+      'controllPanel.updateRounds',
+      this.p1RoundsWon,
+      this.p2RoundsWon,
+    );
+
+    const isGameEnded = this.isGameEnded();
+    if (isGameEnded) {
+      const resultText =
+        this.p1RoundsWon > this.p2RoundsWon ? 'Player 1 won!' : 'Player 2 won!';
+      this.eventBus.emit(
+        'controllPanel.updateContent',
+        resultText,
+        'Play again',
+      );
+      this.stateMachine.trigger(this.triggers.GameEnded);
+      return;
+    }
+
     const resultText =
-      result === 1 ? 'Player 1 wins' : result === -1 ? 'Player 2 wins' : 'Draw';
-    this.eventBus.emit('controllPanel.updateContent', resultText, 'Play again');
+      result === 1
+        ? 'Player 1 won the round'
+        : result === -1
+          ? 'Player 2 won the round'
+          : 'Draw';
+    this.eventBus.emit('controllPanel.updateContent', resultText, 'Next round');
+  }
+
+  isGameEnded() {
+    const maxWins = Math.ceil(this.rounds / 2);
+    return this.p1RoundsWon === maxWins || this.p2RoundsWon === maxWins;
   }
 }
