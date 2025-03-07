@@ -117,8 +117,12 @@ export default class World {
   }
 
   async loadResources() {
-    this.diceHitboardSound = new Audio('/sounds/dice-hit-board.mp3');
-    this.diceHitDiceSound = new Audio('/sounds/dice-hit-dice.mp3');
+    this.diceHitboardSound = new Audio(
+      urlBuilder.buildUrl('/sounds/dice-hit-board.mp3'),
+    );
+    this.diceHitDiceSound = new Audio(
+      urlBuilder.buildUrl('/sounds/dice-hit-dice.mp3'),
+    );
 
     this.resourceLoader.loadingManager.onProgress = (
       _url,
