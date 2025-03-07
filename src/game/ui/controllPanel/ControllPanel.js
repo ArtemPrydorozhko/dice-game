@@ -6,14 +6,30 @@ class ControllPanel extends HTMLElement {
     super();
     this.eventBus = EventBus.getInstance();
     this.listeners = [];
-    this.currentBarProgress = 0;
     this.active = false;
+    this.playerMaxWins = 2;
     this.attachShadow({ mode: 'open' });
 
     this.shadowRoot.innerHTML = `
         <style>${styles}</style>
 
         <div class="controll-panel">
+            <div class="controll-panel__players">
+                <div class="controll-panel__player">
+                    <div class="controll-panel__player-name">Player 1</div>
+                    <div class="controll-panel__player-rounds">
+                        <div class="controll-panel__player-round"></div>
+                        <div class="controll-panel__player-round"></div>
+                    </div>
+                </div>
+                <div class="controll-panel__player">
+                    <div class="controll-panel__player-name">Player 2</div>
+                    <div class="controll-panel__player-rounds">
+                        <div class="controll-panel__player-round"></div>
+                        <div class="controll-panel__player-round"></div>
+                    </div>
+                </div>
+            </div>
             <div class="controll-panel__action-desciption"></div>
             <button class="controll-panel__action-button"></button>
         </div>
@@ -47,6 +63,21 @@ class ControllPanel extends HTMLElement {
         'controllPanel.updateContent',
         onContentChange,
       );
+    });
+
+    const onUpdateRounds = this.updateRounds.bind(this);
+    this.eventBus.on('controllPanel.updateRounds', onUpdateRounds);
+    this.listeners.push(() => {
+      this.eventBus.removeListener(
+        'controllPanel.updateRounds',
+        onUpdateRounds,
+      );
+    });
+
+    const onResetRounds = this.resetRounds.bind(this);
+    this.eventBus.on('controllPanel.resetRounds', onResetRounds);
+    this.listeners.push(() => {
+      this.eventBus.removeListener('controllPanel.resetRounds', onResetRounds);
     });
 
     const onButtonClick = this.onButtonClick.bind(this);
@@ -88,6 +119,33 @@ class ControllPanel extends HTMLElement {
     } else {
       this._description.style.visibility = 'hidden';
     }
+  }
+
+  updateRounds(player1RoundsWon, player2RoundsWon) {
+    const player1Rounds = this.shadowRoot.querySelectorAll(
+      '.controll-panel__player .controll-panel__player-round',
+    );
+    const player2Rounds = this.shadowRoot.querySelectorAll(
+      '.controll-panel__player:nth-child(2) .controll-panel__player-round',
+    );
+
+    for (let i = 0; i < this.playerMaxWins; i++) {
+      if (player1RoundsWon > i) {
+        player1Rounds[i].classList.add('controll-panel__player-round--won');
+      }
+      if (player2RoundsWon > i) {
+        player2Rounds[i].classList.add('controll-panel__player-round--won');
+      }
+    }
+  }
+
+  resetRounds() {
+    const playerRounds = this.shadowRoot.querySelectorAll(
+      '.controll-panel__player-round',
+    );
+    playerRounds.forEach((round) => {
+      round.classList.remove('controll-panel__player-round--won');
+    });
   }
 }
 
