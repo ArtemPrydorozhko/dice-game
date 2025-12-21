@@ -16,7 +16,7 @@ class MainMenu extends HTMLElement {
             <div class="main-menu__title">Dice Game</div>
             <div class="main-menu__buttons">
                 <button class="main-menu__button main-menu__play-1">Play 1</button>
-                <button class="main-menu__button main-menu__play-2">Placeholder button</button>
+                <button class="main-menu__button main-menu__play-2">Play 2</button>
                 <button class="main-menu__button main-menu__play-3">Placeholder button long</button>
                 <button class="main-menu__button main-menu__play-3">Placeholder</button>
             </div>
@@ -33,6 +33,13 @@ class MainMenu extends HTMLElement {
     play1Button.addEventListener('click', onPlay1ButtonClick);
     this.listeners.push(() => {
       play1Button.removeEventListener('click', onPlay1ButtonClick);
+    });
+
+    const onPlay2ButtonClick = this.onPlay2ButtonClick.bind(this);
+    const play2Button = this.shadowRoot.querySelector('.main-menu__play-2');
+    play2Button.addEventListener('click', onPlay2ButtonClick);
+    this.listeners.push(() => {
+      play2Button.removeEventListener('click', onPlay2ButtonClick);
     });
 
     const onOpenMainMenu = this.open.bind(this);
@@ -83,6 +90,10 @@ class MainMenu extends HTMLElement {
 
   onPlay1ButtonClick() {
     this.eventBus.emit('play1');
+  }
+
+  onPlay2ButtonClick() {
+    this.eventBus.emit('play2');
   }
 }
 

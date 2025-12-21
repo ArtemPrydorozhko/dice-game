@@ -4,6 +4,7 @@ import { wait } from '../utils/time.js';
 import DiceCombination from './DiceCombination.js';
 import StateMachine from '../utils/StateMachine.js';
 import EventBus from '../utils/EventBus.js';
+import { WebRTCTransport } from '../../transport/WebRTC.js';
 
 const p1DicePositions = [
   { x: 6.3, y: 2.15, z: 2 },
@@ -36,6 +37,9 @@ export default class Controller {
 
     this.onPlay1 = this.play1.bind(this);
     this.eventBus.on('play1', this.onPlay1);
+
+    this.onPlay2 = this.play2.bind(this);
+    this.eventBus.on('play2', this.onPlay2);
 
     this.onAction = this.nextAction.bind(this);
     this.eventBus.on('controllPanel.action', this.onAction);
@@ -252,6 +256,54 @@ export default class Controller {
     this.eventBus.emit('closeMainMenu');
     this.eventBus.emit('controllPanel.show');
     this.stateMachine.trigger(this.triggers.RoundStarted);
+  }
+
+  async play2() {
+    this.eventBus.emit('closeMainMenu');
+    this.eventBus.emit('webRTCSetup.show');
+    this.eventBus.on('webRTCSetup.host.start', this.onHostStart.bind(this));
+    this.eventBus.on(
+      'webRTCSetup.join.offerSet',
+      this.onJoinOfferSet.bind(this),
+    );
+  }
+
+  async onHostStart() {
+    const webRTCTransport = new WebRTCTransport();
+    webRTCTransport.events.on('offer', (offer) => {
+      this.eventBus.emit('webRTCSetup.host.offerCreated', offer);
+    });
+    this.eventBus.on('webRTCSetup.host.answerSet', async (answer) => {
+      await webRTCTransport.setAnswer(answer);
+    });
+    webRTCTransport.events.on('dataChannel.open', () => {
+      this.eventBus.emit('webRTCSetup.hide');
+      this.eventBus.emit('controllPanel.show');
+      this.stateMachine.trigger(this.triggers.RoundStarted);
+      webRTCTransport.dataChannel.send('Game started!');
+      webRTCTransport.dataChannel.addEventListener('message', (event) => {
+        console.log('Received message from peer:', event.data);
+      });
+    });
+
+    await webRTCTransport.createOffer();
+  }
+
+  async onJoinOfferSet(offer) {
+    const webRTCTransport = new WebRTCTransport();
+    await webRTCTransport.createAnswer(offer);
+    webRTCTransport.events.on('answer', (answer) => {
+      this.eventBus.emit('webRTCSetup.join.answerCreated', answer);
+    });
+    webRTCTransport.events.on('dataChannel.open', () => {
+      this.eventBus.emit('webRTCSetup.hide');
+      this.eventBus.emit('controllPanel.show');
+      this.stateMachine.trigger(this.triggers.RoundStarted);
+      webRTCTransport.dataChannel.send('Game started!');
+      webRTCTransport.dataChannel.addEventListener('message', (event) => {
+        console.log('Received message from peer:', event.data);
+      });
+    });
   }
 
   nextAction() {
