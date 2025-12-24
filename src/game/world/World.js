@@ -79,7 +79,7 @@ export default class World {
     });
   }
 
-  createDice(physics = true) {
+  createDice(physics = true, addToScene = true) {
     const dice = new Dice(
       this.diceModel,
       physics,
@@ -87,7 +87,9 @@ export default class World {
       this.diceHitboardSound,
       this.diceHitDiceSound,
     );
-    this.scene.add(dice.object);
+    if (addToScene) {
+      this.scene.add(dice.object);
+    }
     if (physics) {
       this.physicWorld.addBody(dice.body);
       this.physicalDices.add(dice);

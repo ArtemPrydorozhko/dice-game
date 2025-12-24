@@ -5,6 +5,7 @@ import DiceCombination from './DiceCombination.js';
 import StateMachine from '../utils/StateMachine.js';
 import EventBus from '../utils/EventBus.js';
 import { WebRTCTransport } from '../../transport/WebRTC.js';
+import { RemotePlayer } from './RemotePlayer.js';
 
 const p1DicePositions = [
   { x: 6.3, y: 2.15, z: 2 },
@@ -31,6 +32,9 @@ export default class Controller {
     this.selectedDices = new Set();
     this.rollingDelay = 5000;
     this.eventBus = EventBus.getInstance();
+    this.host = false;
+    this.singlePlayer = true;
+    this.remotePlayer = null;
 
     this.onWorldReady = this.startGame.bind(this);
     this.world.events.on('ready', this.onWorldReady);
@@ -103,14 +107,19 @@ export default class Controller {
               target: this.states.Player1Rolling,
             },
           },
-          onEntry: () => {
+          onEntry: async () => {
             this.removePlayerDices();
             this.p1Turn = true;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 1 turn',
-              'Roll',
+              this.singlePlayer || this.host ? 'Roll' : undefined,
             );
+            if (!this.singlePlayer && !this.host) {
+              await this.remotePlayer.getSync();
+              this.stateMachine.trigger(this.triggers.PlayerRolled);
+              this.remotePlayer.sendSync();
+            }
           },
         },
         [this.states.Player1Rolling]: {
@@ -124,7 +133,32 @@ export default class Controller {
               'controllPanel.updateContent',
               'Player 1 rolling...',
             );
-            await this.rollPlayerDices();
+            if (this.singlePlayer) {
+              await this.rollPlayerDices();
+            } else if (this.host) {
+              this.remotePlayer.sendSync();
+              await this.remotePlayer.getSync();
+              const rollParameters = this.generateRollParameters(5);
+              this.remotePlayer.sendRollParameters(rollParameters);
+              this.rollDicesWithParameters(rollParameters);
+              await wait(this.rollingDelay);
+              const rolledDicesParameters = this.getRolledDicesParameters();
+              this.remotePlayer.sendRolledDicesParameters(
+                rolledDicesParameters,
+              );
+              this.setPlayerDices();
+              this.removeRollingDices();
+            } else {
+              const rollParameters =
+                await this.remotePlayer.getRollParameters();
+              this.rollDicesWithParameters(rollParameters);
+
+              const rolledDicesParameters =
+                await this.remotePlayer.getRolledDicesParameters();
+              this.adjustRolledDices(rolledDicesParameters);
+              this.setPlayerDices();
+              this.removeRollingDices();
+            }
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
         },
@@ -134,13 +168,18 @@ export default class Controller {
               target: this.states.Player2Rolling,
             },
           },
-          onEntry: () => {
+          onEntry: async () => {
             this.p1Turn = false;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 2 turn',
-              'Roll',
+              this.singlePlayer || !this.host ? 'Roll' : undefined,
             );
+            if (!this.singlePlayer && this.host) {
+              await this.remotePlayer.getSync();
+              this.stateMachine.trigger(this.triggers.PlayerRolled);
+              this.remotePlayer.sendSync();
+            }
           },
         },
         [this.states.Player2Rolling]: {
@@ -154,7 +193,32 @@ export default class Controller {
               'controllPanel.updateContent',
               'Player 2 rolling...',
             );
-            await this.rollPlayerDices();
+            if (this.singlePlayer) {
+              await this.rollPlayerDices();
+            } else if (!this.host) {
+              this.remotePlayer.sendSync();
+              await this.remotePlayer.getSync();
+              const rollParameters = this.generateRollParameters(5);
+              this.remotePlayer.sendRollParameters(rollParameters);
+              this.rollDicesWithParameters(rollParameters);
+              await wait(this.rollingDelay);
+              const rolledDicesParameters = this.getRolledDicesParameters();
+              this.remotePlayer.sendRolledDicesParameters(
+                rolledDicesParameters,
+              );
+              this.setPlayerDices();
+              this.removeRollingDices();
+            } else {
+              const rollParameters =
+                await this.remotePlayer.getRollParameters();
+              this.rollDicesWithParameters(rollParameters);
+
+              const rolledDicesParameters =
+                await this.remotePlayer.getRolledDicesParameters();
+              this.adjustRolledDices(rolledDicesParameters);
+              this.setPlayerDices();
+              this.removeRollingDices();
+            }
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
         },
@@ -167,13 +231,18 @@ export default class Controller {
               target: this.states.Player2Selecting,
             },
           },
-          onEntry: () => {
+          onEntry: async () => {
             this.p1Turn = true;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 1 selecting dices to reroll...',
-              'Reroll selected',
+              this.singlePlayer || this.host ? 'Reroll selected' : undefined,
             );
+            if (!this.singlePlayer && !this.host) {
+              await this.remotePlayer.getSync();
+              this.stateMachine.trigger(this.triggers.PlayerSelected);
+              this.remotePlayer.sendSync();
+            }
           },
         },
         [this.states.Player1Rerolling]: {
@@ -187,7 +256,53 @@ export default class Controller {
               'controllPanel.updateContent',
               'Player 1 rerolling...',
             );
-            await this.rollSelectedDices();
+            if (this.singlePlayer) {
+              await this.rollSelectedDices();
+            } else if (this.host) {
+              this.remotePlayer.sendSync();
+              await this.remotePlayer.getSync();
+
+              const playerDices = this.p1Turn ? this.p1Dices : this.p2Dices;
+              const order = Array.from(this.selectedDices.values()).map(
+                (selectedDice) => playerDices.indexOf(selectedDice),
+              );
+              this.remotePlayer.sendRerollOrder(order);
+
+              await this.remotePlayer.getSync();
+              this.removeSelected();
+              const rollParameters = this.generateRollParameters(order.length);
+              this.remotePlayer.sendRollParameters(rollParameters);
+              this.rollDicesWithParameters(rollParameters);
+
+              await wait(this.rollingDelay);
+              const rolledDicesParameters = this.getRolledDicesParameters();
+              this.remotePlayer.sendRolledDicesParameters(
+                rolledDicesParameters,
+              );
+              this.setPlayerDices(order);
+              this.removeRollingDices();
+            } else {
+              const order = await this.remotePlayer.getRerollOrder();
+              if (order.length === 0) {
+                this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
+                return;
+              }
+              this.remotePlayer.sendSync();
+              const rollParameters =
+                await this.remotePlayer.getRollParameters();
+              const playerDices = this.p1Turn ? this.p1Dices : this.p2Dices;
+              order.forEach((position) => {
+                this.selectedDices.add(playerDices[position]);
+              });
+              this.removeSelected();
+              this.rollDicesWithParameters(rollParameters);
+
+              const rolledDicesParameters =
+                await this.remotePlayer.getRolledDicesParameters();
+              this.adjustRolledDices(rolledDicesParameters);
+              this.setPlayerDices(order);
+              this.removeRollingDices();
+            }
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
         },
@@ -200,13 +315,18 @@ export default class Controller {
               target: this.states.EndOfRound,
             },
           },
-          onEntry: () => {
+          onEntry: async () => {
             this.p1Turn = false;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 2 selecting dices to reroll...',
-              'Reroll selected',
+              this.singlePlayer || !this.host ? 'Reroll selected' : undefined,
             );
+            if (!this.singlePlayer && this.host) {
+              await this.remotePlayer.getSync();
+              this.stateMachine.trigger(this.triggers.PlayerSelected);
+              this.remotePlayer.sendSync();
+            }
           },
         },
         [this.states.Player2Rerolling]: {
@@ -220,7 +340,53 @@ export default class Controller {
               'controllPanel.updateContent',
               'Player 2 rerolling...',
             );
-            await this.rollSelectedDices();
+            if (this.singlePlayer) {
+              await this.rollSelectedDices();
+            } else if (!this.host) {
+              this.remotePlayer.sendSync();
+              await this.remotePlayer.getSync();
+
+              const playerDices = this.p1Turn ? this.p1Dices : this.p2Dices;
+              const order = Array.from(this.selectedDices.values()).map(
+                (selectedDice) => playerDices.indexOf(selectedDice),
+              );
+              this.remotePlayer.sendRerollOrder(order);
+
+              await this.remotePlayer.getSync();
+              this.removeSelected();
+              const rollParameters = this.generateRollParameters(order.length);
+              this.remotePlayer.sendRollParameters(rollParameters);
+              this.rollDicesWithParameters(rollParameters);
+
+              await wait(this.rollingDelay);
+              const rolledDicesParameters = this.getRolledDicesParameters();
+              this.remotePlayer.sendRolledDicesParameters(
+                rolledDicesParameters,
+              );
+              this.setPlayerDices(order);
+              this.removeRollingDices();
+            } else {
+              const order = await this.remotePlayer.getRerollOrder();
+              if (order.length === 0) {
+                this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
+                return;
+              }
+              this.remotePlayer.sendSync();
+              const rollParameters =
+                await this.remotePlayer.getRollParameters();
+              const playerDices = this.p1Turn ? this.p1Dices : this.p2Dices;
+              order.forEach((position) => {
+                this.selectedDices.add(playerDices[position]);
+              });
+              this.removeSelected();
+              this.rollDicesWithParameters(rollParameters);
+
+              const rolledDicesParameters =
+                await this.remotePlayer.getRolledDicesParameters();
+              this.adjustRolledDices(rolledDicesParameters);
+              this.setPlayerDices(order);
+              this.removeRollingDices();
+            }
             this.stateMachine.trigger(this.triggers.PlayerDicesLanded);
           },
         },
@@ -279,11 +445,10 @@ export default class Controller {
     webRTCTransport.events.on('dataChannel.open', () => {
       this.eventBus.emit('webRTCSetup.hide');
       this.eventBus.emit('controllPanel.show');
+      this.host = true;
+      this.singlePlayer = false;
+      this.remotePlayer = new RemotePlayer(webRTCTransport);
       this.stateMachine.trigger(this.triggers.RoundStarted);
-      webRTCTransport.dataChannel.send('Game started!');
-      webRTCTransport.dataChannel.addEventListener('message', (event) => {
-        console.log('Received message from peer:', event.data);
-      });
     });
 
     await webRTCTransport.createOffer();
@@ -298,15 +463,13 @@ export default class Controller {
     webRTCTransport.events.on('dataChannel.open', () => {
       this.eventBus.emit('webRTCSetup.hide');
       this.eventBus.emit('controllPanel.show');
+      this.singlePlayer = false;
+      this.remotePlayer = new RemotePlayer(webRTCTransport);
       this.stateMachine.trigger(this.triggers.RoundStarted);
-      webRTCTransport.dataChannel.send('Game started!');
-      webRTCTransport.dataChannel.addEventListener('message', (event) => {
-        console.log('Received message from peer:', event.data);
-      });
     });
   }
 
-  nextAction() {
+  async nextAction() {
     const currentState = this.stateMachine.state;
     switch (currentState) {
       case this.states.Player1ToRoll:
@@ -316,6 +479,9 @@ export default class Controller {
       case this.states.Player1Selecting:
       case this.states.Player2Selecting:
         if (this.selectedDices.size === 0) {
+          this.remotePlayer.sendSync();
+          await this.remotePlayer.getSync();
+          this.remotePlayer.sendRerollOrder([]);
           this.stateMachine.trigger(this.triggers.PlayerSkippedReroll);
         } else {
           this.stateMachine.trigger(this.triggers.PlayerSelected);
@@ -402,7 +568,7 @@ export default class Controller {
       Math.random() * (forceRangeZ[1] - forceRangeZ[0]) + forceRangeZ[0];
 
     for (let i = 0; i < amount; i++) {
-      const dice = this.world.createDice(true);
+      const dice = this.world.createDice();
 
       dice.object.position.set(
         startingPositions[i][0] + positionDeviation,
@@ -424,6 +590,118 @@ export default class Controller {
 
       this.rollingDices.push(dice);
     }
+  }
+
+  generateRollParameters(amount) {
+    const startingPositions = [
+      [1, 4, 5],
+      [-0.2, 4, 5.5],
+      [-1, 4, 4],
+      [-0.1, 4, 3],
+      [0.5, 4, 3.8],
+    ];
+
+    const forceRangeX = [-50, 50];
+    const forceRangeY = [-50, 50];
+    const forceRangeZ = [-250, -500];
+
+    const positionDeviation = Math.random() - 0.5;
+    const forcePointCoord = Math.random() * 0.05 + 0.05;
+    const forceX =
+      Math.random() * (forceRangeX[1] - forceRangeX[0]) + forceRangeX[0];
+    const forceY =
+      Math.random() * (forceRangeY[1] - forceRangeY[0]) + forceRangeY[0];
+    const forceZ =
+      Math.random() * (forceRangeZ[1] - forceRangeZ[0]) + forceRangeZ[0];
+
+    const parameters = [];
+
+    for (let i = 0; i < amount; i++) {
+      const position = {
+        x: startingPositions[i][0] + positionDeviation,
+        y: startingPositions[i][1] + positionDeviation,
+        z: startingPositions[i][2] + positionDeviation,
+      };
+
+      const rotation = {
+        x: Math.random() * 2 * Math.PI,
+        y: Math.random() * 2 * Math.PI,
+        z: Math.random() * 2 * Math.PI,
+      };
+
+      parameters.push({
+        position,
+        rotation,
+      });
+    }
+
+    return {
+      diceParameters: parameters,
+      forceParameters: {
+        x: forceX,
+        y: forceY,
+        z: forceZ,
+        point: forcePointCoord,
+      },
+    };
+  }
+
+  rollDicesWithParameters(rollParameters) {
+    const { diceParameters, forceParameters } = rollParameters;
+
+    for (let i = 0; i < diceParameters.length; i++) {
+      const dice = this.world.createDice();
+
+      const { position, rotation } = diceParameters[i];
+      dice.object.position.set(position.x, position.y, position.z);
+      dice.object.rotation.set(rotation.x, rotation.y, rotation.z);
+      dice.body.position.copy(dice.object.position);
+      dice.body.quaternion.copy(dice.object.quaternion);
+
+      dice.body.applyForce(
+        new CANNON.Vec3(
+          forceParameters.x,
+          forceParameters.y,
+          forceParameters.z,
+        ),
+        new CANNON.Vec3(
+          forceParameters.point,
+          forceParameters.point,
+          forceParameters.point,
+        ),
+      );
+
+      this.rollingDices.push(dice);
+    }
+  }
+
+  getRolledDicesParameters() {
+    const rolledDicesParameters = this.rollingDices.map((dice) => ({
+      position: {
+        x: dice.object.position.x,
+        y: dice.object.position.y,
+        z: dice.object.position.z,
+      },
+      rotation: {
+        x: dice.object.rotation.x,
+        y: dice.object.rotation.y,
+        z: dice.object.rotation.z,
+      },
+    }));
+    return rolledDicesParameters;
+  }
+
+  adjustRolledDices(rolledDicesParameters) {
+    this.rollingDices.forEach((dice, i) => {
+      const face = dice.getTopFace();
+      const dummyDice = this.world.createDice(false, false);
+      const rotation = rolledDicesParameters[i].rotation;
+      dummyDice.object.rotation.set(rotation.x, rotation.y, rotation.z);
+      const actualFace = dummyDice.getTopFace();
+      if (face !== actualFace) {
+        dice.object.rotation.set(rotation.x, rotation.y, rotation.z);
+      }
+    });
   }
 
   removeRollingDices() {
