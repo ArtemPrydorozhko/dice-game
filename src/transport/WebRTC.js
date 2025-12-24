@@ -13,19 +13,24 @@ export class WebRTCTransport {
 
   async createOffer() {
     this.peerConnection = new RTCPeerConnection(servers);
-
     this.dataChannel = this.peerConnection.createDataChannel('dataChannel');
     this.dataChannel.addEventListener('open', () => {
       console.log('Data channel is open');
       this.events.emit('dataChannel.open');
     });
-    this.peerConnection.addEventListener('icecandidate', async (event) => {
+    this.dataChannel.addEventListener('message', (event) => {
+      console.log('Received message from peer:', event.data);
+      this.events.emit('dataChannel.message', JSON.parse(event.data));
+    });
+    this.peerConnection.addEventListener('icecandidate', (event) => {
       if (event.candidate) {
         console.log('New ICE candidate: ', event.candidate);
         this.events.emit(
           'offer',
           JSON.stringify(this.peerConnection.localDescription),
         );
+      } else {
+        console.log('ICE gathering complete');
       }
     });
 
@@ -43,13 +48,15 @@ export class WebRTCTransport {
   async createAnswer(remoteOffer) {
     this.peerConnection = new RTCPeerConnection(servers);
 
-    this.peerConnection.addEventListener('icecandidate', async (event) => {
+    this.peerConnection.addEventListener('icecandidate', (event) => {
       if (event.candidate) {
         console.log('New ICE candidate: ', event.candidate);
         this.events.emit(
           'answer',
           JSON.stringify(this.peerConnection.localDescription),
         );
+      } else {
+        console.log('ICE gathering complete');
       }
     });
 
@@ -65,6 +72,10 @@ export class WebRTCTransport {
         console.log('Data channel is open');
         this.events.emit('dataChannel.open');
       });
+      this.dataChannel.addEventListener('message', (event) => {
+        console.log('Received message from peer:', event.data);
+        this.events.emit('dataChannel.message', JSON.parse(event.data));
+      });
     });
 
     this.peerConnection.addEventListener('connectionstatechange', () => {
@@ -79,5 +90,12 @@ export class WebRTCTransport {
     const answer = JSON.parse(remoteAnswer);
     if (this.peerConnection.currentRemoteDescription) return;
     await this.peerConnection.setRemoteDescription(answer);
+  }
+
+  send(message) {
+    console.log('Sending message to peer:', this.dataChannel.readyState);
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      this.dataChannel.send(JSON.stringify(message));
+    }
   }
 }
