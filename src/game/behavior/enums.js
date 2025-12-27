@@ -1,0 +1,7 @@
+export const PlayerActions = {
+  ROLL_DICES: 'ROLL_DICES',
+  ROLLED_DICES: 'ROLLED_DICES',
+  REROLL_ORDER: 'REROLL_ORDER',
+  SYNC: 'SYNC',
+  SYNC_STATE: 'SYNC_STATE',
+};

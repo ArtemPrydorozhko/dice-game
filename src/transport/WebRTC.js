@@ -9,6 +9,20 @@ export class WebRTCTransport {
     this.peerConnection = null;
     this.dataChannel = null;
     this.events = new EventEmitter();
+    this.messageId = 0;
+  }
+
+  onMessage(event) {
+    const data = JSON.parse(event.data);
+    console.log('Received message from peer:', data);
+
+    if (data.ack) {
+      return;
+    }
+    const { message, id } = data;
+    this.sendAck(id);
+
+    this.events.emit(`dataChannel.message`, message);
   }
 
   async createOffer() {
@@ -18,10 +32,7 @@ export class WebRTCTransport {
       console.log('Data channel is open');
       this.events.emit('dataChannel.open');
     });
-    this.dataChannel.addEventListener('message', (event) => {
-      console.log('Received message from peer:', event.data);
-      this.events.emit('dataChannel.message', JSON.parse(event.data));
-    });
+    this.dataChannel.addEventListener('message', this.onMessage.bind(this));
     this.peerConnection.addEventListener('icecandidate', (event) => {
       if (event.candidate) {
         console.log('New ICE candidate: ', event.candidate);
@@ -72,10 +83,7 @@ export class WebRTCTransport {
         console.log('Data channel is open');
         this.events.emit('dataChannel.open');
       });
-      this.dataChannel.addEventListener('message', (event) => {
-        console.log('Received message from peer:', event.data);
-        this.events.emit('dataChannel.message', JSON.parse(event.data));
-      });
+      this.dataChannel.addEventListener('message', this.onMessage.bind(this));
     });
 
     this.peerConnection.addEventListener('connectionstatechange', () => {
@@ -92,10 +100,27 @@ export class WebRTCTransport {
     await this.peerConnection.setRemoteDescription(answer);
   }
 
-  send(message) {
-    console.log('Sending message to peer:', this.dataChannel.readyState);
+  async send(message) {
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
-      this.dataChannel.send(JSON.stringify(message));
+      const id = this.messageId++;
+      console.log('Sending message to peer:', message, id);
+      this.dataChannel.send(JSON.stringify({ message, id }));
+      await new Promise((resolve) => {
+        const cb = (rawData) => {
+          const data = JSON.parse(rawData.data);
+          if (data.ack && data.id === id) {
+            this.dataChannel.removeEventListener('message', cb);
+            resolve();
+          }
+        };
+        this.dataChannel.addEventListener('message', cb);
+      });
+    }
+  }
+
+  sendAck(id) {
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      this.dataChannel.send(JSON.stringify({ ack: true, id }));
     }
   }
 }

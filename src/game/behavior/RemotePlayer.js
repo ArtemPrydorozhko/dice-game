@@ -1,94 +1,65 @@
-import { EventEmitter } from '../utils/EventEmitter';
+import { Player } from './Player';
+import { PlayerConnector } from './PlayerConnector';
 
-export class RemotePlayer {
-  constructor(transport) {
-    this.transport = transport;
-    this.transport.events.on(
-      'dataChannel.message',
-      this.processMessage.bind(this),
-    );
-    this.events = new EventEmitter();
+export class RemotePlayer extends Player {
+  constructor(world, dicePositions, userPointerHelper, playerConnector) {
+    super(world, dicePositions, userPointerHelper);
+    this.playerConnector = playerConnector;
   }
 
-  processMessage(message) {
-    if (message.action === 'rollDices') {
-      message.data.diceParameters;
-      message.data.forceParameters;
-    }
+  async rollDices() {
+    const rollParameters = await this.generateRollParameters();
+    this.rollDicesWithParameters(rollParameters);
+
+    const rolledDicesParameters = await this.getRolledDicesParameters();
+    this.adjustRolledDices(rolledDicesParameters);
+
+    this.setDices();
+    this.removeRollingDices();
   }
 
-  sendRollParameters(rollParameters) {
-    this.transport.send({
-      action: 'rollDices',
-      data: rollParameters,
+  async rerollSelectedDices() {
+    const order = await this.getSelectedDicesOrder();
+    order.forEach((index) => {
+      this.world.removeDice(this.dices[index]);
+      this.dices[index] = null;
     });
+    const rollParameters = await this.generateRollParameters(order.length);
+
+    this.rollDicesWithParameters(rollParameters);
+    const rolledDicesParameters = await this.getRolledDicesParameters();
+    this.adjustRolledDices(rolledDicesParameters);
+
+    this.setDices(order);
+    this.removeRollingDices();
   }
 
-  sendRolledDicesParameters(rolledDicesParameters) {
-    this.transport.send({
-      action: 'rolledDices',
-      data: rolledDicesParameters,
-    });
-  }
-
-  sendRerollOrder(order) {
-    this.transport.send({
-      action: 'rerollOrder',
-      data: order,
-    });
-  }
-
-  getRollParameters() {
-    return new Promise((resolve) => {
-      const cb = (message) => {
-        if (message.action === 'rollDices') {
-          this.transport.events.removeListener('dataChannel.message', cb);
-          resolve(message.data);
-        }
-      };
-      this.transport.events.on('dataChannel.message', cb);
-    });
+  generateRollParameters(_amount) {
+    return this.playerConnector.getRollParameters();
   }
 
   getRolledDicesParameters() {
-    return new Promise((resolve) => {
-      const cb = (message) => {
-        if (message.action === 'rolledDices') {
-          this.transport.events.removeListener('dataChannel.message', cb);
-          resolve(message.data);
-        }
-      };
-      this.transport.events.on('dataChannel.message', cb);
+    return this.playerConnector.getRolledDicesParameters();
+  }
+
+  getSelectedDicesOrder() {
+    return this.playerConnector.getRerollOrder();
+  }
+
+  adjustRolledDices(rolledDicesParameters) {
+    this.rollingDices.forEach((dice, i) => {
+      const face = dice.getTopFace();
+      const dummyDice = this.world.createDice(false, false);
+      const rotation = rolledDicesParameters[i].rotation;
+      dummyDice.setRotation(rotation.x, rotation.y, rotation.z);
+      const actualFace = dummyDice.getTopFace();
+      if (face !== actualFace) {
+        dice.setRotation(rotation.x, rotation.y, rotation.z);
+      }
+      this.world.removeDice(dummyDice);
     });
   }
 
-  getRerollOrder() {
-    return new Promise((resolve) => {
-      const cb = (message) => {
-        if (message.action === 'rerollOrder') {
-          this.transport.events.removeListener('dataChannel.message', cb);
-          resolve(message.data);
-        }
-      };
-      this.transport.events.on('dataChannel.message', cb);
-    });
-  }
-
-  sendSync() {
-    this.transport.send({
-      action: 'sync',
-    });
-  }
-
-  getSync() {
-    return new Promise((resolve) => {
-      const cb = (message) => {
-        if (message.action === 'sync') {
-          this.transport.events.removeListener('dataChannel.message', cb);
-          resolve();
-        }
-      };
-      this.transport.events.on('dataChannel.message', cb);
-    });
-  }
+  listenSelectDice() {}
+  removeListenSelectDice() {}
 }

@@ -62,6 +62,39 @@ export default class Dice {
     }
   }
 
+  getPosition() {
+    const { x, y, z } = this.object.position;
+    return { x, y, z };
+  }
+
+  getRotation() {
+    const { x, y, z } = this.object.rotation;
+    return { x, y, z };
+  }
+
+  setPosition(x, y, z) {
+    this.object.position.set(x, y, z);
+    if (this.physics) {
+      this.body.position.copy(this.object.position);
+    }
+  }
+
+  setRotation(x, y, z) {
+    this.object.rotation.set(x, y, z);
+    if (this.physics) {
+      this.body.quaternion.copy(this.object.quaternion);
+    }
+  }
+
+  applyForce(forceX, forceY, forceZ, pointX, pointY, pointZ) {
+    if (this.physics) {
+      this.body.applyForce(
+        new CANNON.Vec3(forceX, forceY, forceZ),
+        new CANNON.Vec3(pointX, pointY, pointZ),
+      );
+    }
+  }
+
   onCollide(collision) {
     if (
       collision.body.material?.name !== 'boardMaterial' &&
