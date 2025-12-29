@@ -7,6 +7,7 @@ import { Player } from './Player.js';
 import { LocalPlayer } from './LocalPlayer.js';
 import { RemotePlayer } from './RemotePlayer.js';
 import { PlayerConnector } from './PlayerConnector.js';
+import { UIManager } from '../ui/UIManager.js';
 
 const p1DicePositions = [
   { x: 6.3, y: 2.15, z: 2 },
@@ -26,26 +27,19 @@ export default class Controller {
     this.world = world;
     this.userPointerHelper = userPointerHelper;
     this.renderer = renderer;
-    this.p1Turn = true;
-    this.rollingDices = [];
-    this.p1Dices = [];
-    this.p2Dices = [];
-    this.selectedDices = new Set();
-    this.rollingDelay = 5000;
     this.eventBus = EventBus.getInstance();
+    this.uiManager = UIManager.getInstance();
     this.host = false;
     this.joiner = false;
     this.singlePlayer = true;
-    this.remotePlayer = null;
 
-    this.onWorldReady = this.startGame.bind(this);
-    this.world.events.on('ready', this.onWorldReady);
+    this.eventBus.on('play.offline', this.playOffline.bind(this));
 
-    this.onPlay1 = this.play1.bind(this);
-    this.eventBus.on('play1', this.onPlay1);
+    this.onPlayOnlineWebRTCHost = this.playOnlineWebRTCHost.bind(this);
+    this.eventBus.on('webRTCSetup.host.start', this.onPlayOnlineWebRTCHost);
 
-    this.onPlay2 = this.play2.bind(this);
-    this.eventBus.on('play2', this.onPlay2);
+    this.onPlayOnlineWebRTCJoiner = this.playOnlineWebRTCJoiner.bind(this);
+    this.eventBus.on('webRTCSetup.join.start', this.onPlayOnlineWebRTCJoiner);
 
     this.onAction = this.nextAction.bind(this);
     this.eventBus.on('controllPanel.action', this.onAction);
@@ -57,16 +51,8 @@ export default class Controller {
     this.setStateMachine();
 
     this.playerConnector = null;
-    this.player1 = new Player(
-      this.world,
-      p1DicePositions,
-      this.userPointerHelper,
-    );
-    this.player2 = new Player(
-      this.world,
-      p2DicePositions,
-      this.userPointerHelper,
-    );
+    this.player1 = null;
+    this.player2 = null;
 
     this.debug = Debug.getInstance();
     if (this.debug.active) {
@@ -118,7 +104,6 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.p1Turn = true;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 1 turn',
@@ -151,7 +136,6 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.p1Turn = false;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 2 turn',
@@ -187,7 +171,6 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.p1Turn = true;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 1 selecting dices to reroll...',
@@ -232,7 +215,6 @@ export default class Controller {
             },
           },
           onEntry: async () => {
-            this.p1Turn = false;
             this.eventBus.emit(
               'controllPanel.updateContent',
               'Player 2 selecting dices to reroll...',
@@ -290,90 +272,75 @@ export default class Controller {
     });
   }
 
-  startGame() {
-    this.eventBus.emit('openMainMenu');
-  }
-
-  async play1() {
-    this.eventBus.emit('closeMainMenu');
-    this.eventBus.emit('controllPanel.show');
+  async playOffline() {
+    this.uiManager.hideMainMenu();
+    this.uiManager.showHUD();
+    this.player1 = new Player(
+      this.world,
+      p1DicePositions,
+      this.userPointerHelper,
+    );
+    this.player2 = new Player(
+      this.world,
+      p2DicePositions,
+      this.userPointerHelper,
+    );
+    this.p1RoundsWon = 0;
+    this.p2RoundsWon = 0;
+    this.setStateMachine();
     this.stateMachine.trigger(this.triggers.RoundStarted);
   }
 
-  async play2() {
-    this.eventBus.emit('closeMainMenu');
-    this.eventBus.emit('webRTCSetup.show');
-    this.eventBus.on('webRTCSetup.host.start', this.onHostStart.bind(this));
-    this.eventBus.on(
-      'webRTCSetup.join.offerSet',
-      this.onJoinOfferSet.bind(this),
+  async playOnlineWebRTCHost() {
+    const webRTCTransport = new WebRTCTransport();
+    await webRTCTransport.createHost();
+    this.uiManager.hideMainMenu();
+    this.uiManager.showHUD();
+    this.host = true;
+    this.singlePlayer = false;
+    this.playerConnector = new PlayerConnector(webRTCTransport);
+    this.player1 = new LocalPlayer(
+      this.world,
+      p1DicePositions,
+      this.userPointerHelper,
+      this.playerConnector,
     );
+    this.player2 = new RemotePlayer(
+      this.world,
+      p2DicePositions,
+      this.userPointerHelper,
+      this.playerConnector,
+    );
+    this.playerConnector.setOnStateChange((state) => {
+      this.stateMachine.trigger(state);
+    });
+    this.stateMachine.trigger(this.triggers.RoundStarted);
   }
 
-  async onHostStart() {
+  async playOnlineWebRTCJoiner() {
     const webRTCTransport = new WebRTCTransport();
-    webRTCTransport.events.on('offer', (offer) => {
-      this.eventBus.emit('webRTCSetup.host.offerCreated', offer);
+    await webRTCTransport.createJoiner();
+    this.uiManager.hideMainMenu();
+    this.uiManager.showHUD();
+    this.joiner = true;
+    this.singlePlayer = false;
+    this.playerConnector = new PlayerConnector(webRTCTransport);
+    this.player1 = new RemotePlayer(
+      this.world,
+      p1DicePositions,
+      this.userPointerHelper,
+      this.playerConnector,
+    );
+    this.player2 = new LocalPlayer(
+      this.world,
+      p2DicePositions,
+      this.userPointerHelper,
+      this.playerConnector,
+    );
+    this.playerConnector.setOnStateChange((state) => {
+      this.stateMachine.trigger(state);
     });
-    this.eventBus.on('webRTCSetup.host.answerSet', async (answer) => {
-      await webRTCTransport.setAnswer(answer);
-    });
-    webRTCTransport.events.on('dataChannel.open', () => {
-      this.eventBus.emit('webRTCSetup.hide');
-      this.eventBus.emit('controllPanel.show');
-      this.host = true;
-      this.singlePlayer = false;
-      this.playerConnector = new PlayerConnector(webRTCTransport);
-      this.player1 = new LocalPlayer(
-        this.world,
-        p1DicePositions,
-        this.userPointerHelper,
-        this.playerConnector,
-      );
-      this.player2 = new RemotePlayer(
-        this.world,
-        p2DicePositions,
-        this.userPointerHelper,
-        this.playerConnector,
-      );
-      this.playerConnector.setOnStateChange((state) => {
-        this.stateMachine.trigger(state);
-      });
-      this.stateMachine.trigger(this.triggers.RoundStarted);
-    });
-
-    await webRTCTransport.createOffer();
-  }
-
-  async onJoinOfferSet(offer) {
-    const webRTCTransport = new WebRTCTransport();
-    await webRTCTransport.createAnswer(offer);
-    webRTCTransport.events.on('answer', (answer) => {
-      this.eventBus.emit('webRTCSetup.join.answerCreated', answer);
-    });
-    webRTCTransport.events.on('dataChannel.open', () => {
-      this.eventBus.emit('webRTCSetup.hide');
-      this.eventBus.emit('controllPanel.show');
-      this.singlePlayer = false;
-      this.joiner = true;
-      this.playerConnector = new PlayerConnector(webRTCTransport);
-      this.player1 = new RemotePlayer(
-        this.world,
-        p1DicePositions,
-        this.userPointerHelper,
-        this.playerConnector,
-      );
-      this.player2 = new LocalPlayer(
-        this.world,
-        p2DicePositions,
-        this.userPointerHelper,
-        this.playerConnector,
-      );
-      this.playerConnector.setOnStateChange((state) => {
-        this.stateMachine.trigger(state);
-      });
-      this.stateMachine.trigger(this.triggers.RoundStarted);
-    });
+    this.stateMachine.trigger(this.triggers.RoundStarted);
   }
 
   async nextAction() {

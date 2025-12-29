@@ -73,9 +73,9 @@ export default class World {
     this.backgroundMusic.setVolume(0.5);
 
     const start = this.start.bind(this);
-    this.eventBus.on('loadingOverlay.removed', start);
+    this.eventBus.on('loadingOverlay.play', start);
     this.listeners.push(() => {
-      this.eventBus.removeListener('loadingOverlay.removed', start);
+      this.eventBus.removeListener('loadingOverlay.play', start);
     });
   }
 
@@ -115,7 +115,7 @@ export default class World {
 
   start() {
     this.backgroundMusic.play();
-    this.events.emit('ready');
+    // this.events.emit('ready');
   }
 
   async loadResources() {

@@ -15,8 +15,8 @@ class MainMenu extends HTMLElement {
         <div class="main-menu">
             <div class="main-menu__title">Dice Game</div>
             <div class="main-menu__buttons">
-                <button class="main-menu__button main-menu__play-1">Play 1</button>
-                <button class="main-menu__button main-menu__play-2">Play 2</button>
+                <button class="main-menu__button main-menu__play-1">Play Offline</button>
+                <button class="main-menu__button main-menu__play-2">Play Online</button>
                 <button class="main-menu__button main-menu__play-3">Placeholder button long</button>
                 <button class="main-menu__button main-menu__play-3">Placeholder</button>
             </div>
@@ -89,11 +89,11 @@ class MainMenu extends HTMLElement {
   }
 
   onPlay1ButtonClick() {
-    this.eventBus.emit('play1');
+    this.eventBus.emit('play.offline');
   }
 
   onPlay2ButtonClick() {
-    this.eventBus.emit('play2');
+    this.eventBus.emit('play.online');
   }
 }
 

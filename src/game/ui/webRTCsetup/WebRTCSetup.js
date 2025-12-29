@@ -11,24 +11,26 @@ class WebRTCSetup extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
         <style>${styles}</style>
-        <div class="webrtc-setup">
-            <div class="webrtc-setup__options">§
+        <div class="webrtc-setup dialog">
+            <div class="webrtc-setup__options">
                 <button class="webrtc-setup__option webrtc-setup__option--host">Host game</button>
                 <button class="webrtc-setup__option webrtc-setup__option--join">Join game</button>
             </div>
             <div class="webrtc-setup__create-offer hidden">
-                <div class="webrtc-setup__create-offer-loading">Loading...</div>
+                <div class="webrtc-setup__create-offer-loading hidden">Loading...</div>
+                <div>Offer</div>
                 <textarea class="webrtc-setup__create-offer-textarea" readonly></textarea>
             </div>
             <div class="webrtc-setup__set-answer hidden">
+                <div>Answer</div>
                 <textarea class="webrtc-setup__set-answer-textarea"></textarea>
-                <button class="webrtc-setup__set-answer-button">Set Answer</button>
             </div>
             <div class="webrtc-setup__set-offer hidden">
+                <div>Offer</div>
                 <textarea class="webrtc-setup__set-offer-textarea"></textarea>
-                <button class="webrtc-setup__set-offer-button">Set Offer</button>
             </div>
             <div class="webrtc-setup__answer hidden">
+                <div>Answer</div>
                 <textarea class="webrtc-setup__answer-textarea" readonly></textarea>
             </div>
         </div>
@@ -36,18 +38,6 @@ class WebRTCSetup extends HTMLElement {
   }
 
   connectedCallback() {
-    const onOpenSetup = this.open.bind(this);
-    this.eventBus.on('webRTCSetup.show', onOpenSetup);
-    this.listeners.push(() => {
-      this.eventBus.removeListener('webRTCSetup.show', onOpenSetup);
-    });
-
-    const onCloseSetup = this.close.bind(this);
-    this.eventBus.on('webRTCSetup.hide', onCloseSetup);
-    this.listeners.push(() => {
-      this.eventBus.removeListener('webRTCSetup.hide', onCloseSetup);
-    });
-
     const onHostButtonClick = this.onHostButtonClick.bind(this);
     const hostButton = this.shadowRoot.querySelector(
       '.webrtc-setup__option--host',
@@ -76,21 +66,21 @@ class WebRTCSetup extends HTMLElement {
     });
 
     const onSetAnswer = this.onSetAnswer.bind(this);
-    const setAnswerButton = this.shadowRoot.querySelector(
-      '.webrtc-setup__set-answer-button',
+    const setAnswerField = this.shadowRoot.querySelector(
+      '.webrtc-setup__set-answer-textarea',
     );
-    setAnswerButton.addEventListener('click', onSetAnswer);
+    setAnswerField.addEventListener('input', onSetAnswer);
     this.listeners.push(() => {
-      setAnswerButton.removeEventListener('click', onSetAnswer);
+      setAnswerField.removeEventListener('input', onSetAnswer);
     });
 
     const onSetOffer = this.onSetOffer.bind(this);
-    const setOfferButton = this.shadowRoot.querySelector(
-      '.webrtc-setup__set-offer-button',
+    const setOfferField = this.shadowRoot.querySelector(
+      '.webrtc-setup__set-offer-textarea',
     );
-    setOfferButton.addEventListener('click', onSetOffer);
+    setOfferField.addEventListener('input', onSetOffer);
     this.listeners.push(() => {
-      setOfferButton.removeEventListener('click', onSetOffer);
+      setOfferField.removeEventListener('input', onSetOffer);
     });
 
     const onJoinAnswerCreated = this.onAnswerCreated.bind(this);
@@ -107,21 +97,17 @@ class WebRTCSetup extends HTMLElement {
     this.listeners.forEach((removeListener) => removeListener());
   }
 
-  open() {
-    this.opened = true;
-    this.shadowRoot.host.classList.add('opened');
-  }
-
-  close() {
-    this.opened = false;
-    this.shadowRoot.host.classList.remove('opened');
-  }
-
   onHostButtonClick() {
     this.eventBus.emit('webRTCSetup.host.start');
     this.shadowRoot
       .querySelector('.webrtc-setup__create-offer')
       .classList.remove('hidden');
+    this.shadowRoot
+      .querySelector('.webrtc-setup__set-answer')
+      .classList.remove('hidden');
+    this.shadowRoot
+      .querySelector('.webrtc-setup__options')
+      .classList.add('hidden');
   }
 
   onOfferCreated(offer) {
@@ -150,6 +136,10 @@ class WebRTCSetup extends HTMLElement {
   }
 
   onJoinButtonClick() {
+    this.eventBus.emit('webRTCSetup.join.start');
+    this.shadowRoot
+      .querySelector('.webrtc-setup__options')
+      .classList.add('hidden');
     this.shadowRoot
       .querySelector('.webrtc-setup__set-offer')
       .classList.remove('hidden');
