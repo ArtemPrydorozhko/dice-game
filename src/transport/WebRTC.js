@@ -1,3 +1,4 @@
+import EventBus from '../game/utils/EventBus';
 import { EventEmitter } from '../game/utils/EventEmitter';
 
 const servers = {
@@ -9,7 +10,24 @@ export class WebRTCTransport {
     this.peerConnection = null;
     this.dataChannel = null;
     this.events = new EventEmitter();
+    this.eventBus = EventBus.getInstance();
     this.messageId = 0;
+  }
+
+  async createHost() {
+    this.eventBus.on('webRTCSetup.host.answerSet', (answer) => {
+      this.setAnswer(answer);
+    });
+
+    await this.createOffer();
+  }
+
+  createJoiner() {
+    const { promise, resolve } = Promise.withResolvers();
+    this.eventBus.on('webRTCSetup.join.offerSet', (offer) =>
+      this.createAnswer(offer).then(resolve),
+    );
+    return promise;
   }
 
   onMessage(event) {
@@ -28,16 +46,18 @@ export class WebRTCTransport {
   async createOffer() {
     this.peerConnection = new RTCPeerConnection(servers);
     this.dataChannel = this.peerConnection.createDataChannel('dataChannel');
+    const { promise, resolve, reject } = Promise.withResolvers();
+
     this.dataChannel.addEventListener('open', () => {
       console.log('Data channel is open');
-      this.events.emit('dataChannel.open');
+      resolve();
     });
     this.dataChannel.addEventListener('message', this.onMessage.bind(this));
     this.peerConnection.addEventListener('icecandidate', (event) => {
       if (event.candidate) {
         console.log('New ICE candidate: ', event.candidate);
-        this.events.emit(
-          'offer',
+        this.eventBus.emit(
+          'webRTCSetup.host.offerCreated',
           JSON.stringify(this.peerConnection.localDescription),
         );
       } else {
@@ -54,6 +74,8 @@ export class WebRTCTransport {
         this.peerConnection.connectionState,
       );
     });
+
+    return promise;
   }
 
   async createAnswer(remoteOffer) {
@@ -62,8 +84,8 @@ export class WebRTCTransport {
     this.peerConnection.addEventListener('icecandidate', (event) => {
       if (event.candidate) {
         console.log('New ICE candidate: ', event.candidate);
-        this.events.emit(
-          'answer',
+        this.eventBus.emit(
+          'webRTCSetup.join.answerCreated',
           JSON.stringify(this.peerConnection.localDescription),
         );
       } else {
@@ -77,11 +99,13 @@ export class WebRTCTransport {
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
 
+    const { promise, resolve, reject } = Promise.withResolvers();
+
     this.peerConnection.addEventListener('datachannel', (event) => {
       this.dataChannel = event.channel;
       this.dataChannel.addEventListener('open', () => {
         console.log('Data channel is open');
-        this.events.emit('dataChannel.open');
+        resolve();
       });
       this.dataChannel.addEventListener('message', this.onMessage.bind(this));
     });
@@ -92,6 +116,8 @@ export class WebRTCTransport {
         this.peerConnection.connectionState,
       );
     });
+
+    return promise;
   }
 
   async setAnswer(remoteAnswer) {

@@ -70,8 +70,7 @@ class GlobalLoadingOverlay extends HTMLElement {
   }
 
   onButtonClick() {
-    this.shadowRoot.host.classList.add('hidden');
-    this.eventBus.emit('loadingOverlay.removed');
+    this.eventBus.emit('loadingOverlay.play');
   }
 }
 
